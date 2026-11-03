@@ -7,6 +7,8 @@ import {
   Mail, KeyRound, ArrowLeft, LogOut, CircleCheck,
 } from "lucide-react";
 import { useAuth } from "./contexts/AuthContext";
+import { useChatSessions } from "./contexts/ChatSessionContext";
+import SecureChatWorkspace from "./components/chat/SecureChatWorkspace";
 
 type View = "chat" | "about" | "signin" | "signup" | "reset" | "workspace";
 type AuthMode = "signin" | "signup";
@@ -489,24 +491,12 @@ function AuthPage({ mode, onMode, onBack, onAuthenticated, confirmationEmail, on
 }
 
 function AuthenticatedWorkspaceView({ user, draftPrompt, onSignOut }: {
-  user: { email?: string; user_metadata?: Record<string, unknown> };
+  user: import("@supabase/supabase-js").User;
   draftPrompt: string;
   onSignOut: () => void;
 }) {
-  const fullName = typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "GuardAI member";
-  return (
-    <div className="workspace-ready-content">
-      <motion.div className="workspace-ready-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
-        <div className="workspace-ready-icon"><CircleCheck size={30} /></div>
-        <span className="hero-kicker">ACCOUNT CONNECTED</span>
-        <h1>Welcome to your <span>private workspace.</span></h1>
-        <p>Your GuardAI account is authenticated. The secure chat processing pipeline is the next integration milestone; no prompt has been sent to an AI provider yet.</p>
-        <div className="workspace-account-row"><UserRound size={17} /><div><strong>{fullName}</strong><small>{user.email ?? "Authenticated account"}</small></div></div>
-        {draftPrompt.trim() && <div className="workspace-draft-note"><Info size={16} /><div><strong>Your unsent draft is still in this browser session.</strong><p>It has not been transmitted or saved to Supabase. We will connect the secure chat pipeline next.</p></div></div>}
-        <button className="primary-button workspace-signout" onClick={onSignOut}><LogOut size={16} /> Sign out</button>
-      </motion.div>
-    </div>
-  );
+  void onSignOut; // The global application header owns the sign-out action.
+  return <SecureChatWorkspace user={user} initialDraftPrompt={draftPrompt} />;
 }
 
 export default function App() {
@@ -518,6 +508,16 @@ export default function App() {
   const [guestGateOpen, setGuestGateOpen] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const { user, loading: authLoading, authEvent, signOut } = useAuth();
+  const { sessions, activeSessionId, setActiveSessionId, setSessions } = useChatSessions();
+  const previousUserId = useRef<string | null>(null);
+  useEffect(() => {
+    const currentUserId = user?.id ?? null;
+    if (previousUserId.current !== currentUserId) {
+      setSessions([]);
+      setActiveSessionId(null);
+      previousUserId.current = currentUserId;
+    }
+  }, [user?.id, setSessions, setActiveSessionId]);
   const recoveryEventHandled = useRef(false);
 
   const navigate = (next: View) => { setView(next); setSidebarOpen(false); };
@@ -584,11 +584,11 @@ export default function App() {
             <button className="icon-button mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={18} /></button>
           </div>
           <div className="sidebar-actions">
-            <button className="new-chat-button" onClick={() => navigate(user ? "workspace" : "chat")}><Plus size={18} /><span>New chat</span><kbd>⌘ K</kbd></button>
+            <button className="new-chat-button" onClick={() => { setActiveSessionId(null); setDraftPrompt(""); navigate(user ? "workspace" : "chat"); }}><Plus size={18} /><span>New chat</span><kbd>⌘ K</kbd></button>
             <button className={`nav-button ${view === "about" ? "nav-active" : ""}`} onClick={() => navigate("about")}><Info size={18} /><span>About GuardAI</span></button>
           </div>
           {!sidebarCollapsed && <>
-            <div className="sidebar-section"><div className="section-label">RECENT CHATS</div><div className="history-empty"><MessageSquare size={19} /><span>{user ? "Your secure conversations will appear here when chat is enabled." : "Your conversations will appear here after you sign in."}</span></div></div>
+            <div className="sidebar-section"><div className="section-label">RECENT CHATS</div>{user && sessions.length > 0 ? <div className="chat-history-list">{sessions.map((session) => <button key={session.id} className={activeSessionId === session.id ? "chat-history-item active" : "chat-history-item"} onClick={() => { setActiveSessionId(session.id); navigate("workspace"); }}><MessageSquare size={15} /><span>{session.title}</span></button>)}</div> : <div className="history-empty"><MessageSquare size={19} /><span>{user ? "Your secure conversations will appear here after your first protected message." : "Your conversations will appear here after you sign in."}</span></div>}</div>
             <div className="sidebar-promo"><div className="promo-icon"><ShieldCheck size={20} /></div><strong>Your privacy comes first</strong><p>Detect sensitive data. Mask it before AI processing. Stay in control.</p><div className="promo-points"><span><Check size={13} /> Data masking</span><span><Check size={13} /> Risk insights</span></div></div>
           </>}
           <div className="sidebar-bottom">
