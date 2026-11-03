@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ArrowUp, Check, ChevronDown, ChevronUp, Clock3, Copy, LoaderCircle, LockKeyhole, MessageSquareText, ShieldAlert, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
@@ -27,6 +29,25 @@ type ChatMessage = {
 };
 
 type Props = { user: User; initialDraftPrompt: string };
+
+/** Historical token IDs are intentionally not reversible. Present them as clear redaction labels. */
+function humanizeRedactedTokens(content: string): string {
+  const labels: Record<string, string> = {
+    PERSON: "Person redacted",
+    EMAIL: "Email redacted",
+    PHONE: "Phone number redacted",
+    CARD: "Payment card redacted",
+    ORG: "Organization redacted",
+    API_KEY: "API credential redacted",
+  };
+  return content.replace(
+    /\[\[GAI_[A-Z0-9]+_(PERSON|EMAIL|PHONE|CARD|ORG|API_KEY)_\d+\]\]|\[(PERSON|EMAIL|PHONE|CARD|ORG|API_KEY)_\d+\]/g,
+    (_token, longType: string | undefined, shortType: string | undefined) => {
+      const type = longType ?? shortType;
+      return type ? `[${labels[type] ?? "Sensitive data redacted"}]` : "[Sensitive data redacted]";
+    },
+  );
+}
 
 function HighlightedText({ text, entities }: { text: string; entities: Entity[] }) {
   const ordered = [...entities].sort((a, b) => a.start - b.start);
@@ -112,7 +133,7 @@ export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props)
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const skipNextSessionLoad = useRef<string | null>(null);
 
@@ -161,7 +182,11 @@ export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props)
     return () => { cancelled = true; };
   }, [activeSessionId, user.id]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, sending]);
+  useEffect(() => {
+    const list = messageListRef.current;
+    if (!list) return;
+    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+  }, [messages, sending]);
 
   const activeTitle = useMemo(() => sessions.find((session) => session.id === activeSessionId)?.title ?? "New secure conversation", [activeSessionId, sessions]);
 
@@ -226,7 +251,7 @@ export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props)
       </header>
 
       <div className="secure-chat-body">
-        <div className="secure-message-list" aria-live="polite">
+        <div className="secure-message-list" aria-live="polite" ref={messageListRef}>
           {loadingHistory && <div className="secure-chat-loading"><LoaderCircle size={17} /> Loading sanitized conversation…</div>}
           {!loadingHistory && messages.length === 0 && (
             <motion.div className="secure-chat-empty" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -245,10 +270,14 @@ export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props)
               {message.role === "assistant" && <div className="secure-assistant-avatar"><Sparkles size={16} /></div>}
               <div className="secure-message-main">
                 <div className="secure-message-author">{message.role === "user" ? "You" : "GuardAI"}<time>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></div>
-                <div className="secure-message-bubble">
+                <div className={`secure-message-bubble ${message.role === "assistant" ? "secure-markdown" : ""}`}>
                   {message.role === "user" && message.security
                     ? <HighlightedText text={message.content} entities={message.security.entities} />
-                    : message.content}
+                    : message.role === "assistant"
+                      ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{humanizeRedactedTokens(message.content)}</ReactMarkdown>
+                      : message.historyOnly
+                        ? humanizeRedactedTokens(message.content)
+                        : message.content}
                 </div>
                 {message.role === "user" && message.security && <SecurityInspection message={message.content} security={message.security} />}
                 {message.role === "user" && message.historyOnly && <div className="secure-history-label"><LockKeyhole size={12} /> Sanitized history · original values were not retained</div>}
@@ -256,7 +285,6 @@ export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props)
             </article>
           ))}
           {sending && <div className="secure-processing"><span className="secure-processing-pulse"><ShieldCheck size={16} /></span><div><strong>GuardAI is protecting your prompt</strong><small>Inspecting sensitive data and preparing a sanitized AI request…</small></div><LoaderCircle size={17} className="secure-spinner" /></div>}
-          <div ref={bottomRef} />
         </div>
 
         <div className="secure-composer-wrap">

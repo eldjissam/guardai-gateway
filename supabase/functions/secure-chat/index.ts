@@ -60,6 +60,41 @@ function safeErrorMessage() {
   return "GuardAI could not complete this protected request. Your unmasked prompt was not sent as a fallback. Please try again.";
 }
 
+
+function readableHistoricalRedactions(content: string): string {
+  const labels: Record<string, string> = {
+    PERSON: "person", EMAIL: "email address", PHONE: "phone number",
+    CARD: "payment card", ORG: "organization", API_KEY: "API credential",
+  };
+  return content.replace(
+    /\[\[GAI_[A-Z0-9]+_(PERSON|EMAIL|PHONE|CARD|ORG|API_KEY)_\d+\]\]/g,
+    (_token, type: string) => `[${labels[type] ?? "sensitive information"} redacted in an earlier message]`,
+  );
+}
+
+/** Derive a short title only from the sanitized prompt; never use the raw prompt. */
+function createSafeConversationTitle(sanitizedPrompt: string): string {
+  const cleaned = sanitizedPrompt
+    .replace(/\[\[GAI_[A-Z0-9]+_(PERSON|EMAIL|PHONE|CARD|ORG|API_KEY)_\d+\]\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "New conversation";
+
+  const intent = cleaned.match(/\b(?:draft|write|prepare|create|explain|summarize|analyze|compare|translate|design|build|review|plan|generate)\b[^.!?]{0,90}/i)?.[0];
+  let candidate = (intent ?? cleaned.split(/[.!?\n]/, 1)[0] ?? "").trim();
+  candidate = candidate
+    .replace(/^(?:please\s+)?(?:help me\s+)?/i, "")
+    .replace(/\b(?:my name is|my email is|my phone number is|my company is|my contact number is)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,.:;-]+|[\s,.:;-]+$/g, "");
+
+  if (!candidate || candidate.length < 4) candidate = cleaned.split(/[.!?\n]/, 1)[0]?.trim() || "New conversation";
+  const words = candidate.split(/\s+/).slice(0, 8);
+  candidate = words.join(" ").replace(/[.,;:]+$/g, "");
+  if (candidate.length > 58) candidate = `${candidate.slice(0, 55).replace(/\s+\S*$/, "")}…`;
+  return candidate.charAt(0).toLocaleUpperCase() + candidate.slice(1);
+}
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -146,6 +181,7 @@ Deno.serve(async (request: Request) => {
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
   let sessionId: string | null = null;
+  let sessionTitle: string | null = null;
   let riskScore = 0;
   let riskLevel = "LOW";
   let entityBreakdown: Record<string, number> = {};
@@ -176,7 +212,7 @@ Deno.serve(async (request: Request) => {
       }
       const { data: ownedSession, error: sessionLookupError } = await admin
         .from("chat_sessions")
-        .select("id")
+        .select("id,title")
         .eq("id", body.sessionId)
         .eq("user_id", userId)
         .maybeSingle();
@@ -184,6 +220,7 @@ Deno.serve(async (request: Request) => {
         return jsonResponse({ error: "This conversation could not be found." }, 404, cors);
       }
       sessionId = ownedSession.id;
+      sessionTitle = ownedSession.title;
     }
 
     const spans = detectSensitiveSpans(originalPrompt);
@@ -207,12 +244,20 @@ Deno.serve(async (request: Request) => {
       if (historyError) throw new Error("HISTORY_LOAD_FAILED");
       for (const message of (priorMessages ?? []).reverse()) {
         if ((message.role === "user" || message.role === "assistant") && typeof message.sanitized_content === "string") {
-          history.push({ role: message.role, content: message.sanitized_content });
+          // Old per-request token IDs cannot be restored in a later request. Replace them
+          // with readable redaction labels before placing earlier turns in the model context.
+          history.push({ role: message.role, content: readableHistoricalRedactions(message.sanitized_content) });
         }
       }
     }
 
     // Crucial privacy boundary: only tokenized current content and sanitized history go to OpenAI.
+    const firstUserTurn = history.find((message) => message.role === "user")?.content;
+    const shouldRefreshGenericTitle = !sessionTitle || sessionTitle === "Secure conversation" || sessionTitle === "New conversation";
+    const conversationTitle = shouldRefreshGenericTitle
+      ? createSafeConversationTitle(firstUserTurn ?? tokenized.sanitizedPrompt)
+      : (sessionTitle ?? "New conversation");
+
     const openAiInput = [...history, { role: "user" as const, content: tokenized.sanitizedPrompt }];
     const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -222,7 +267,7 @@ Deno.serve(async (request: Request) => {
         model,
         store: false,
         max_output_tokens: 1000,
-        instructions: "You are GuardAI's helpful assistant. Markers such as [[GAI_...]] are opaque privacy placeholders. Never guess or reconstruct hidden values. Preserve each marker exactly if you need to refer to it. Answer naturally and safely.",
+        instructions: "You are GuardAI's helpful assistant. Current-turn markers such as [[GAI_...]] are opaque privacy placeholders. Never guess or reconstruct hidden values. Preserve a current-turn marker exactly only when needed. Earlier messages may contain explanatory labels such as [email address redacted in an earlier message]; these are not recoverable values. Never output internal GuardAI token IDs. Answer naturally, clearly and safely. Format responses with useful Markdown when appropriate.",
         input: openAiInput,
       }),
     });
@@ -254,7 +299,7 @@ Deno.serve(async (request: Request) => {
       const { error: createSessionError } = await admin.from("chat_sessions").insert({
         id: finalSessionId,
         user_id: userId,
-        title: "Secure conversation",
+        title: conversationTitle,
       });
       if (createSessionError) throw new Error("SESSION_SAVE_FAILED");
     }
@@ -269,7 +314,7 @@ Deno.serve(async (request: Request) => {
       throw new Error("MESSAGE_SAVE_FAILED");
     }
 
-    await admin.from("chat_sessions").update({ updated_at: now }).eq("id", finalSessionId).eq("user_id", userId);
+    await admin.from("chat_sessions").update({ title: conversationTitle, updated_at: now }).eq("id", finalSessionId).eq("user_id", userId);
     const elapsed = Date.now() - startedAt;
     const { error: auditError } = await admin.from("security_events").insert({
       request_id: requestId,

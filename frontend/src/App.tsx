@@ -9,6 +9,7 @@ import {
 import { useAuth } from "./contexts/AuthContext";
 import { useChatSessions } from "./contexts/ChatSessionContext";
 import SecureChatWorkspace from "./components/chat/SecureChatWorkspace";
+import ChatHistoryList from "./components/layout/ChatHistoryList";
 
 type View = "chat" | "about" | "signin" | "signup" | "reset" | "workspace";
 type AuthMode = "signin" | "signup";
@@ -508,7 +509,7 @@ export default function App() {
   const [guestGateOpen, setGuestGateOpen] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const { user, loading: authLoading, authEvent, signOut } = useAuth();
-  const { sessions, activeSessionId, setActiveSessionId, setSessions } = useChatSessions();
+  const { activeSessionId, setActiveSessionId, setSessions } = useChatSessions();
   const previousUserId = useRef<string | null>(null);
   useEffect(() => {
     const currentUserId = user?.id ?? null;
@@ -588,7 +589,7 @@ export default function App() {
             <button className={`nav-button ${view === "about" ? "nav-active" : ""}`} onClick={() => navigate("about")}><Info size={18} /><span>About GuardAI</span></button>
           </div>
           {!sidebarCollapsed && <>
-            <div className="sidebar-section"><div className="section-label">RECENT CHATS</div>{user && sessions.length > 0 ? <div className="chat-history-list">{sessions.map((session) => <button key={session.id} className={activeSessionId === session.id ? "chat-history-item active" : "chat-history-item"} onClick={() => { setActiveSessionId(session.id); navigate("workspace"); }}><MessageSquare size={15} /><span>{session.title}</span></button>)}</div> : <div className="history-empty"><MessageSquare size={19} /><span>{user ? "Your secure conversations will appear here after your first protected message." : "Your conversations will appear here after you sign in."}</span></div>}</div>
+            <div className="sidebar-section">{user ? <ChatHistoryList activeSessionId={activeSessionId} onSelect={(sessionId) => { setActiveSessionId(sessionId); navigate("workspace"); }} /> : <><div className="section-label">RECENT CHATS</div><div className="history-empty"><MessageSquare size={19} /><span>Your conversations will appear here after you sign in.</span></div></>}</div>
             <div className="sidebar-promo"><div className="promo-icon"><ShieldCheck size={20} /></div><strong>Your privacy comes first</strong><p>Detect sensitive data. Mask it before AI processing. Stay in control.</p><div className="promo-points"><span><Check size={13} /> Data masking</span><span><Check size={13} /> Risk insights</span></div></div>
           </>}
           <div className="sidebar-bottom">

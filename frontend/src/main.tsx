@@ -7,6 +7,8 @@ import "./styles.css";
 import "./auth-fixes.css";
 import "./auth-status.css";
 import "./secure-chat.css";
+import "./secure-chat-quality.css";
+import "./history-management.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
