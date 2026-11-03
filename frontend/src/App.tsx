@@ -1,13 +1,14 @@
-import { useState, type FormEvent, type KeyboardEvent, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight, ArrowUp, BarChart3, Check, ChevronDown, Info, LockKeyhole,
   Menu, MessageSquare, Moon, PanelLeftClose, PanelLeftOpen, Plus, Shield,
   ShieldCheck, Sparkles, Sun, UserRound, X, Zap, Globe2, Eye, EyeOff,
-  Mail, KeyRound, ArrowLeft,
+  Mail, KeyRound, ArrowLeft, LogOut, CircleCheck,
 } from "lucide-react";
+import { useAuth } from "./contexts/AuthContext";
 
-type View = "chat" | "about" | "signin" | "signup";
+type View = "chat" | "about" | "signin" | "signup" | "reset" | "workspace";
 type AuthMode = "signin" | "signup";
 type Theme = "dark" | "light";
 
@@ -262,19 +263,134 @@ function AboutView() {
   );
 }
 
-function AuthPage({ mode, onMode, onBack }: {
-  mode: AuthMode;
+type AuthPageMode = AuthMode | "reset";
+type Notice = { kind: "success" | "error" | "info"; message: string } | null;
+
+function AuthPage({ mode, onMode, onBack, onAuthenticated, confirmationEmail, onRegistrationPending, onClearConfirmation }: {
+  mode: AuthPageMode;
   onMode: (mode: AuthMode) => void;
   onBack: () => void;
+  onAuthenticated: () => void;
+  confirmationEmail: string | null;
+  onRegistrationPending: (email: string) => void;
+  onClearConfirmation: () => void;
 }) {
+  const { isConfigured, signIn, signUp, resendConfirmation, resetPassword, updatePassword } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [email, setEmail] = useState("");
   const isSignup = mode === "signup";
+  const isReset = mode === "reset";
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setNotice("Authentication will be connected to Supabase in the next integration phase. No account has been created yet.");
+    const formElement = event.currentTarget;
+    if (isSubmitting) return;
+    if (!isConfigured) {
+      setNotice({ kind: "error", message: "Supabase is not configured yet. Add the project URL and publishable key to frontend/.env.local, then restart the development server." });
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const password = String(formData.get("password") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+    if ((isSignup || isReset) && password !== confirmPassword) {
+      setNotice({ kind: "error", message: "The passwords do not match. Please check both fields." });
+      return;
+    }
+    if (password.length < 8) {
+      setNotice({ kind: "error", message: "Use a password with at least 8 characters." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setNotice(null);
+    try {
+      if (isReset) {
+        await updatePassword(password);
+        setNotice({ kind: "success", message: "Your password has been updated. You are now signed in." });
+        onAuthenticated();
+        return;
+      }
+
+      if (isSignup) {
+        const fullName = String(formData.get("fullName") ?? "").trim();
+        if (fullName.length < 2) {
+          setNotice({ kind: "error", message: "Please enter your full name." });
+          return;
+        }
+        const normalizedEmail = email.trim().toLowerCase();
+        const result = await signUp(fullName, normalizedEmail, password);
+        if (result.emailConfirmationRequired) {
+          // Clear all credential fields before navigating away from sign-up.
+          formElement.reset();
+          setEmail("");
+          setShowPassword(false);
+          onRegistrationPending(normalizedEmail);
+        } else {
+          formElement.reset();
+          setEmail("");
+          onClearConfirmation();
+          onAuthenticated();
+        }
+      } else {
+        await signIn(email.trim().toLowerCase(), password);
+        onClearConfirmation();
+        onAuthenticated();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Authentication failed. Please try again.";
+      setNotice({ kind: "error", message });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const sendResetEmail = async () => {
+    if (!isConfigured) {
+      setNotice({ kind: "error", message: "Supabase is not configured yet. Add your project URL and publishable key first." });
+      return;
+    }
+    if (!email.trim()) {
+      setNotice({ kind: "info", message: "Enter your account email address first, then select Forgot password." });
+      return;
+    }
+    setIsSubmitting(true);
+    setNotice(null);
+    try {
+      await resetPassword(email.trim());
+      setNotice({ kind: "success", message: "Password reset email sent. Open the email on this device and follow its link to choose a new password." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "We could not send the reset email. Please try again.";
+      setNotice({ kind: "error", message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resendSignupConfirmation = async () => {
+    if (!confirmationEmail || isSubmitting) return;
+    setIsSubmitting(true);
+    setNotice(null);
+    try {
+      await resendConfirmation(confirmationEmail);
+      setNotice({ kind: "success", message: "A new confirmation email has been sent. Check your inbox and spam folder." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "We could not resend the confirmation email. Please try again.";
+      setNotice({ kind: "error", message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const title = isReset ? "Choose a new password" : isSignup ? "Create your account" : "Welcome back.";
+  const description = isReset
+    ? "Choose a new password for your GuardAI account."
+    : isSignup
+      ? "Create your secure workspace and take control of your AI conversations."
+      : "Sign in to continue to your protected AI workspace.";
 
   return (
     <motion.main
@@ -285,58 +401,65 @@ function AuthPage({ mode, onMode, onBack }: {
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: .32, ease: "easeOut" }}
     >
-      <button className="auth-back icon-button" onClick={onBack} aria-label="Back to GuardAI home">
-        <ArrowLeft size={19} />
-      </button>
-
+      <button className="auth-back icon-button" onClick={onBack} aria-label="Back to GuardAI home"><ArrowLeft size={19} /></button>
       <div className="auth-split">
         <motion.section className="auth-form-panel" layout transition={{ duration: .45 }}>
           <div className="auth-form-inner">
             <button className="auth-brand-button" onClick={onBack} aria-label="GuardAI home"><Brand /></button>
             <div className="auth-heading">
-              <span className="hero-kicker">{isSignup ? "START WITH PRIVACY" : "YOUR PRIVACY, YOUR CONTROL"}</span>
-              <h1>{isSignup ? "Create your account" : "Welcome back."}</h1>
-              <p>{isSignup ? "Create your secure workspace and take control of your AI conversations." : "Sign in to continue to your protected AI workspace."}</p>
+              <span className="hero-kicker">{isReset ? "ACCOUNT RECOVERY" : isSignup ? "START WITH PRIVACY" : "YOUR PRIVACY, YOUR CONTROL"}</span>
+              <h1>{title}</h1>
+              <p>{description}</p>
             </div>
+
+            {!isSignup && !isReset && confirmationEmail && (
+              <section className="email-confirmation-panel" role="status" aria-live="polite">
+                <div className="email-confirmation-icon"><CircleCheck size={20} /></div>
+                <div className="email-confirmation-copy">
+                  <strong>Account created. Check your inbox.</strong>
+                  <p>We sent a verification link to <b>{confirmationEmail}</b>. Open it in this browser to verify your address. If Supabase establishes a session, GuardAI will open your workspace automatically.</p>
+                  <button type="button" className="email-resend-button" onClick={resendSignupConfirmation} disabled={isSubmitting}>
+                    {isSubmitting ? "Sending…" : "Resend confirmation email"}
+                  </button>
+                </div>
+              </section>
+            )}
 
             <form className="auth-page-form" onSubmit={submit}>
               {isSignup && (
-                <label>
-                  Full name
-                  <span className="auth-input-wrap"><UserRound size={17} /><input type="text" name="fullName" placeholder="Your full name" autoComplete="name" required /></span>
+                <label>Full name
+                  <span className="auth-input-wrap"><UserRound size={17} /><input type="text" name="fullName" placeholder="Your full name" autoComplete="name" minLength={2} required /></span>
                 </label>
               )}
-              <label>
-                Email address
-                <span className="auth-input-wrap"><Mail size={17} /><input type="email" name="email" placeholder="you@example.com" autoComplete="email" required /></span>
-              </label>
-              <label>
-                Password
+              {!isReset && (
+                <label>Email address
+                  <span className="auth-input-wrap"><Mail size={17} /><input type="email" name="email" placeholder="you@example.com" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></span>
+                </label>
+              )}
+              <label>{isReset ? "New password" : "Password"}
                 <span className="auth-input-wrap">
                   <KeyRound size={17} />
-                  <input type={showPassword ? "text" : "password"} name="password" placeholder="At least 8 characters" minLength={8} autoComplete={isSignup ? "new-password" : "current-password"} required />
-                  <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}>
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+                  <input type={showPassword ? "text" : "password"} name="password" placeholder={isReset ? "Enter your new password" : "At least 8 characters"} minLength={8} autoComplete={isSignup || isReset ? "new-password" : "current-password"} required />
+                  <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                 </span>
               </label>
-              {isSignup && (
-                <label>
-                  Confirm password
-                  <span className="auth-input-wrap"><LockKeyhole size={17} /><input type="password" name="confirmPassword" placeholder="Repeat your password" minLength={8} required /></span>
+              {(isSignup || isReset) && (
+                <label>Confirm password
+                  <span className="auth-input-wrap"><LockKeyhole size={17} /><input type={showPassword ? "text" : "password"} name="confirmPassword" placeholder="Repeat your password" minLength={8} autoComplete="new-password" required /></span>
                 </label>
               )}
-              {!isSignup && <button type="button" className="forgot-link" onClick={() => setNotice("Password reset will be available after Supabase Auth is connected.")}>Forgot password?</button>}
-              <button className="primary-button auth-page-submit" type="submit">
-                {isSignup ? "Create account" : "Sign in"} <ArrowRight size={18} />
+              {!isSignup && !isReset && <button type="button" className="forgot-link" onClick={sendResetEmail} disabled={isSubmitting}>Forgot password?</button>}
+              <button className="primary-button auth-page-submit" type="submit" disabled={isSubmitting || !isConfigured}>
+                {isSubmitting ? "Please wait…" : isReset ? "Update password" : isSignup ? "Create account" : "Sign in"} <ArrowRight size={18} />
               </button>
-              {notice && <p className="auth-notice" role="status">{notice}</p>}
+              {!isConfigured && <p className="auth-notice auth-notice-info" role="status">Supabase connection is not configured yet. Complete the environment setup to enable accounts.</p>}
+              {notice && <p className={`auth-notice auth-notice-${notice.kind}`} role="status">{notice.message}</p>}
             </form>
 
             <div className="auth-page-switch">
-              {isSignup ? "Already have an account?" : "New to GuardAI?"}
-              <button onClick={() => { setNotice(""); onMode(isSignup ? "signin" : "signup"); }}>
-                {isSignup ? "Sign in" : "Create account"}
+              {isReset ? "Remembered your password?" : isSignup ? "Already have an account?" : "New to GuardAI?"}
+              <button onClick={() => { setNotice(null); onMode("signin"); }}>
+                {isReset ? "Back to sign in" : isSignup ? "Sign in" : "Create account"}
               </button>
             </div>
             <div className="auth-assurance"><ShieldCheck size={15} /> Protected processing is available after authentication.</div>
@@ -344,24 +467,14 @@ function AuthPage({ mode, onMode, onBack }: {
         </motion.section>
 
         <motion.section className="auth-visual-panel" layout transition={{ duration: .45 }}>
-          <div className="auth-orbit orbit-one" />
-          <div className="auth-orbit orbit-two" />
+          <div className="auth-orbit orbit-one" /><div className="auth-orbit orbit-two" />
           <div className="auth-visual-content">
-            <motion.div
-              className="auth-visual-shield"
-              animate={{ y: [0, -8, 0], rotate: [0, 2, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <ShieldCheck size={76} strokeWidth={1.35} />
-              <Sparkles className="auth-visual-spark" size={20} />
+            <motion.div className="auth-visual-shield" animate={{ y: [0, -8, 0], rotate: [0, 2, 0] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}>
+              <ShieldCheck size={76} strokeWidth={1.35} /><Sparkles className="auth-visual-spark" size={20} />
             </motion.div>
             <span className="hero-kicker">GUARDAI GATEWAY</span>
-            <h2>{isSignup ? "Your AI. Your data. Your control." : "Think freely. Share safely."}</h2>
-            <p>
-              {isSignup
-                ? "Bring privacy into every AI interaction with visible protection and transparent security insights."
-                : "Your sensitive information is detected and masked before it reaches an external AI service."}
-            </p>
+            <h2>{isSignup ? "Your AI. Your data. Your control." : isReset ? "Regain control securely." : "Think freely. Share safely."}</h2>
+            <p>{isSignup ? "Bring privacy into every AI interaction with visible protection and transparent security insights." : isReset ? "Choose a new password and return to your protected workspace." : "Your sensitive information is detected and masked before it reaches an external AI service."}</p>
             <div className="auth-visual-points">
               <span><Check size={15} /> Sensitive data detection</span>
               <span><Check size={15} /> Dynamic data masking</span>
@@ -375,6 +488,27 @@ function AuthPage({ mode, onMode, onBack }: {
   );
 }
 
+function AuthenticatedWorkspaceView({ user, draftPrompt, onSignOut }: {
+  user: { email?: string; user_metadata?: Record<string, unknown> };
+  draftPrompt: string;
+  onSignOut: () => void;
+}) {
+  const fullName = typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "GuardAI member";
+  return (
+    <div className="workspace-ready-content">
+      <motion.div className="workspace-ready-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
+        <div className="workspace-ready-icon"><CircleCheck size={30} /></div>
+        <span className="hero-kicker">ACCOUNT CONNECTED</span>
+        <h1>Welcome to your <span>private workspace.</span></h1>
+        <p>Your GuardAI account is authenticated. The secure chat processing pipeline is the next integration milestone; no prompt has been sent to an AI provider yet.</p>
+        <div className="workspace-account-row"><UserRound size={17} /><div><strong>{fullName}</strong><small>{user.email ?? "Authenticated account"}</small></div></div>
+        {draftPrompt.trim() && <div className="workspace-draft-note"><Info size={16} /><div><strong>Your unsent draft is still in this browser session.</strong><p>It has not been transmitted or saved to Supabase. We will connect the secure chat pipeline next.</p></div></div>}
+        <button className="primary-button workspace-signout" onClick={onSignOut}><LogOut size={16} /> Sign out</button>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState<View>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -382,25 +516,58 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>("dark");
   const [draftPrompt, setDraftPrompt] = useState("");
   const [guestGateOpen, setGuestGateOpen] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+  const { user, loading: authLoading, authEvent, signOut } = useAuth();
+  const recoveryEventHandled = useRef(false);
 
-  const navigate = (next: View) => {
-    setView(next);
-    setSidebarOpen(false);
+  const navigate = (next: View) => { setView(next); setSidebarOpen(false); };
+  const openAuth = (mode: AuthMode = "signin") => {
+    if (mode === "signup") setConfirmationEmail(null);
+    navigate(mode);
   };
-  const openAuth = (mode: AuthMode = "signin") => navigate(mode);
+  const handleRegistrationPending = (email: string) => {
+    setConfirmationEmail(email);
+    navigate("signin");
+  };
+  const clearConfirmationEmail = () => setConfirmationEmail(null);
+  const handleSignOut = async () => {
+    try { await signOut(); setGuestGateOpen(false); navigate("chat"); }
+    catch (error) { console.error("Sign out failed", error); }
+  };
+  const handleAuthenticated = () => navigate("workspace");
 
-  if (view === "signin" || view === "signup") {
+  useEffect(() => {
+    if (authLoading) return;
+    if (authEvent === "PASSWORD_RECOVERY" && !recoveryEventHandled.current) {
+      recoveryEventHandled.current = true;
+      setView("reset");
+      return;
+    }
+    if (authEvent !== "PASSWORD_RECOVERY") recoveryEventHandled.current = false;
+    if (!user && view === "workspace") setView("chat");
+    if (user && (view === "signin" || view === "signup")) {
+      setConfirmationEmail(null);
+      setView("workspace");
+    }
+    if (user && view === "chat" && (authEvent === "SIGNED_IN" || authEvent === "INITIAL_SESSION")) setView("workspace");
+  }, [authLoading, authEvent, user, view]);
+
+  if (view === "signin" || view === "signup" || view === "reset") {
+    const authMode: AuthPageMode = view;
     return (
       <div className="app-shell auth-shell" data-theme={theme}>
         <AnimatedBackdrop />
-        <div className="auth-theme-control">
-          <button className="icon-button theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme">
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-        </div>
-        <AnimatePresence mode="wait">
-          <AuthPage key="auth" mode={view} onMode={openAuth} onBack={() => navigate("chat")} />
-        </AnimatePresence>
+        <div className="auth-theme-control"><button className="icon-button theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme">{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button></div>
+        <AnimatePresence mode="wait"><AuthPage
+            key={authMode}
+            mode={authMode}
+            onMode={openAuth}
+            onBack={() => navigate("chat")}
+            onAuthenticated={handleAuthenticated}
+            confirmationEmail={confirmationEmail}
+            onRegistrationPending={handleRegistrationPending}
+            onClearConfirmation={clearConfirmationEmail}
+          /></AnimatePresence>
       </div>
     );
   }
@@ -409,46 +576,25 @@ export default function App() {
     <div className="app-shell" data-theme={theme}>
       <AnimatedBackdrop />
       <div className="app-frame">
-        <AnimatePresence>
-          {sidebarOpen && (
-            <motion.button className="mobile-scrim" aria-label="Close navigation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSidebarOpen(false)} />
-          )}
-        </AnimatePresence>
-        <motion.aside
-          className={`sidebar ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${sidebarOpen ? "sidebar-mobile-open" : ""}`}
-          initial={false}
-          animate={{ width: sidebarCollapsed ? 76 : 258 }}
-          transition={{ duration: .24, ease: [0.22, 1, .36, 1] }}
-        >
+        <AnimatePresence>{sidebarOpen && <motion.button className="mobile-scrim" aria-label="Close navigation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSidebarOpen(false)} />}</AnimatePresence>
+        <motion.aside className={`sidebar ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${sidebarOpen ? "sidebar-mobile-open" : ""}`} initial={false} animate={{ width: sidebarCollapsed ? 76 : 258 }} transition={{ duration: .24, ease: [0.22, 1, .36, 1] }}>
           <div className="sidebar-top">
-            <button className="brand-button" onClick={() => navigate("chat")} aria-label="GuardAI home"><Brand compact={sidebarCollapsed} /></button>
-            <button className="icon-button sidebar-toggle desktop-only" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
-              {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-            </button>
+            <button className="brand-button" onClick={() => navigate(user ? "workspace" : "chat")} aria-label="GuardAI home"><Brand compact={sidebarCollapsed} /></button>
+            <button className="icon-button sidebar-toggle desktop-only" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
             <button className="icon-button mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={18} /></button>
           </div>
           <div className="sidebar-actions">
-            <button className="new-chat-button" onClick={() => navigate("chat")}><Plus size={18} /><span>New chat</span><kbd>⌘ K</kbd></button>
+            <button className="new-chat-button" onClick={() => navigate(user ? "workspace" : "chat")}><Plus size={18} /><span>New chat</span><kbd>⌘ K</kbd></button>
             <button className={`nav-button ${view === "about" ? "nav-active" : ""}`} onClick={() => navigate("about")}><Info size={18} /><span>About GuardAI</span></button>
           </div>
-          {!sidebarCollapsed && (
-            <>
-              <div className="sidebar-section">
-                <div className="section-label">RECENT CHATS</div>
-                <div className="history-empty"><MessageSquare size={19} /><span>Your conversations will appear here after you sign in.</span></div>
-              </div>
-              <div className="sidebar-promo">
-                <div className="promo-icon"><ShieldCheck size={20} /></div>
-                <strong>Your privacy comes first</strong>
-                <p>Detect sensitive data. Mask it before AI processing. Stay in control.</p>
-                <div className="promo-points"><span><Check size={13} /> Data masking</span><span><Check size={13} /> Risk insights</span></div>
-              </div>
-            </>
-          )}
+          {!sidebarCollapsed && <>
+            <div className="sidebar-section"><div className="section-label">RECENT CHATS</div><div className="history-empty"><MessageSquare size={19} /><span>{user ? "Your secure conversations will appear here when chat is enabled." : "Your conversations will appear here after you sign in."}</span></div></div>
+            <div className="sidebar-promo"><div className="promo-icon"><ShieldCheck size={20} /></div><strong>Your privacy comes first</strong><p>Detect sensitive data. Mask it before AI processing. Stay in control.</p><div className="promo-points"><span><Check size={13} /> Data masking</span><span><Check size={13} /> Risk insights</span></div></div>
+          </>}
           <div className="sidebar-bottom">
-            <button className="profile-entry" onClick={() => openAuth("signin")}>
+            <button className="profile-entry" onClick={() => user ? navigate("workspace") : openAuth("signin")}>
               <span className="avatar-placeholder"><UserRound size={17} /></span>
-              {!sidebarCollapsed && <span className="profile-copy"><strong>Guest workspace</strong><small>Sign in to save your chats</small></span>}
+              {!sidebarCollapsed && <span className="profile-copy"><strong>{user ? (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "GuardAI member") : "Guest workspace"}</strong><small>{user?.email ?? "Sign in to save your chats"}</small></span>}
               {!sidebarCollapsed && <ChevronDown size={15} className="muted-icon" />}
             </button>
           </div>
@@ -456,32 +602,22 @@ export default function App() {
 
         <main className="main-panel">
           <header className="topbar">
-            <div className="topbar-left">
-              <button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
-              <span className="mobile-brand"><Brand /></span>
-              <span className="topbar-context">{view === "chat" ? "Private AI workspace" : "Discover GuardAI"}</span>
-            </div>
+            <div className="topbar-left"><button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><span className="mobile-brand"><Brand /></span><span className="topbar-context">{view === "chat" ? "Private AI workspace" : view === "workspace" ? "Your authenticated workspace" : "Discover GuardAI"}</span></div>
             <div className="topbar-actions">
               <span className="protection-pill"><i /> Privacy layer ready</span>
               <button className="icon-button theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
-              <button className="primary-button top-signin" onClick={() => openAuth("signin")}>Sign in <ArrowRight size={15} /></button>
+              {user ? <button className="primary-button top-signin" onClick={handleSignOut}><LogOut size={15} /> Sign out</button> : <button className="primary-button top-signin" onClick={() => openAuth("signin")}>Sign in <ArrowRight size={15} /></button>}
             </div>
           </header>
           <AnimatePresence mode="wait">
-            {view === "chat"
-              ? <motion.div key="chat" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><LandingView onSignIn={openAuth} prompt={draftPrompt} setPrompt={setDraftPrompt} onRequestToSend={() => setGuestGateOpen(true)} /></motion.div>
-              : <motion.div key="about" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AboutView /></motion.div>
-            }
+            {view === "chat" && <motion.div key="chat" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><LandingView onSignIn={openAuth} prompt={draftPrompt} setPrompt={setDraftPrompt} onRequestToSend={() => user ? navigate("workspace") : setGuestGateOpen(true)} /></motion.div>}
+            {view === "about" && <motion.div key="about" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AboutView /></motion.div>}
+            {view === "workspace" && user && <motion.div key="workspace" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AuthenticatedWorkspaceView user={user} draftPrompt={draftPrompt} onSignOut={handleSignOut} /></motion.div>}
           </AnimatePresence>
-          <footer className="page-footer"><span>GuardAI Gateway</span><span>Privacy-first AI · Academic prototype</span><span className="footer-status"><i /> Guest preview</span></footer>
+          <footer className="page-footer"><span>GuardAI Gateway</span><span>Privacy-first AI · Academic prototype</span><span className="footer-status"><i /> {user ? "Authenticated session" : "Guest preview"}</span></footer>
         </main>
       </div>
-      <GuestAccessDialog
-        open={guestGateOpen}
-        onClose={() => setGuestGateOpen(false)}
-        onCreateAccount={() => { setGuestGateOpen(false); openAuth("signup"); }}
-        onSignIn={() => { setGuestGateOpen(false); openAuth("signin"); }}
-      />
+      <GuestAccessDialog open={guestGateOpen && !user} onClose={() => setGuestGateOpen(false)} onCreateAccount={() => { setGuestGateOpen(false); openAuth("signup"); }} onSignIn={() => { setGuestGateOpen(false); openAuth("signin"); }} />
     </div>
   );
 }

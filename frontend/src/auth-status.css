@@ -1,0 +1,58 @@
+
+/* Supabase authentication feedback and authenticated workspace. */
+.auth-page-submit:disabled { opacity: .58; cursor: not-allowed; transform: none; }
+.forgot-link:disabled { opacity: .55; cursor: wait; }
+.auth-notice { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 11px 12px; border-radius: 11px; font-size: 11px; line-height: 1.55; }
+.auth-notice-success { color: #9be8c4; border: 1px solid rgba(52,211,153,.25); background: rgba(16,185,129,.09); }
+.auth-notice-error { color: #fda4af; border: 1px solid rgba(251,113,133,.28); background: rgba(244,63,94,.08); }
+.auth-notice-info { color: #fcd58a; border: 1px solid rgba(245,158,11,.24); background: rgba(245,158,11,.07); }
+.workspace-ready-content { flex: 1; min-height: 0; width: min(calc(100% - 36px), 920px); margin: auto; display: grid; place-items: center; padding: 30px 0; }
+.workspace-ready-card { width: min(100%, 680px); padding: clamp(24px, 5vw, 48px); border: 1px solid var(--line-strong); border-radius: 26px; background: linear-gradient(145deg, rgba(8,34,22,.92), rgba(7,18,13,.88)); box-shadow: 0 28px 90px rgba(0,0,0,.26), 0 0 55px rgba(16,185,129,.06); }
+[data-theme="light"] .workspace-ready-card { background: linear-gradient(145deg, #fff, #effaf3); }
+.workspace-ready-icon { width: 58px; height: 58px; display: grid; place-items: center; color: #6ee7b7; border-radius: 18px; background: rgba(16,185,129,.13); margin-bottom: 22px; }
+.workspace-ready-card h1 { margin: 8px 0 12px; color: var(--text); font: 600 clamp(29px, 5vw, 46px)/1.08 "Space Grotesk", sans-serif; letter-spacing: -1.8px; }
+.workspace-ready-card h1 span { color: #5ee0a7; }
+.workspace-ready-card > p { max-width: 560px; color: var(--muted); font-size: 13px; line-height: 1.75; }
+.workspace-account-row { display: flex; align-items: center; gap: 12px; margin-top: 24px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.035); color: #6ee7b7; }
+.workspace-account-row div { min-width: 0; display: grid; gap: 3px; }
+.workspace-account-row strong { color: var(--text); font-size: 12px; }
+.workspace-account-row small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.workspace-draft-note { display: flex; gap: 10px; margin-top: 13px; padding: 13px; border: 1px solid rgba(245,158,11,.22); border-radius: 13px; background: rgba(245,158,11,.06); color: #f5c56b; }
+.workspace-draft-note svg { flex: 0 0 auto; }
+.workspace-draft-note strong { font-size: 11px; }
+.workspace-draft-note p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.workspace-signout { margin-top: 22px; }
+@media (max-width: 640px) { .workspace-ready-content { width: calc(100% - 28px); padding: 20px 0 max(24px, env(safe-area-inset-bottom)); }.workspace-ready-card { padding: 23px 19px; border-radius: 21px; }.workspace-ready-card h1 { font-size: 31px; }.workspace-ready-card > p { font-size: 12px; } }
+
+/* Email confirmation status shown on the sign-in page after registration. */
+.email-confirmation-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 13px 14px;
+  border: 1px solid rgba(52, 211, 153, .28);
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(16,185,129,.12), rgba(16,185,129,.045));
+}
+.email-confirmation-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #6ee7b7;
+  background: rgba(16,185,129,.13);
+}
+.email-confirmation-copy { min-width: 0; }
+.email-confirmation-copy strong { display: block; color: var(--text); font-size: 12px; line-height: 1.45; }
+.email-confirmation-copy p { margin: 4px 0 7px; color: var(--muted); font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; }
+.email-confirmation-copy b { color: #8ce5bc; font-weight: 700; }
+.email-resend-button { padding: 0; border: 0; background: transparent; color: #5ee0a7; font-size: 10px; font-weight: 700; }
+.email-resend-button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 640px) {
+  .email-confirmation-panel { gap: 9px; margin-bottom: 14px; padding: 11px; }
+  .email-confirmation-copy strong { font-size: 11px; }
+  .email-confirmation-copy p { font-size: 10px; }
+}
