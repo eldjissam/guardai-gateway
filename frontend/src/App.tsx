@@ -47,12 +47,20 @@ function AnimatedBackdrop() {
   );
 }
 
-function LandingView({ onSignIn }: { onSignIn: (mode?: AuthMode) => void }) {
-  const [prompt, setPrompt] = useState("");
-
+function LandingView({
+  onSignIn,
+  onRequestToSend,
+  prompt,
+  setPrompt,
+}: {
+  onSignIn: (mode?: AuthMode) => void;
+  onRequestToSend: () => void;
+  prompt: string;
+  setPrompt: (value: string) => void;
+}) {
   const send = (event?: FormEvent) => {
     event?.preventDefault();
-    if (prompt.trim()) onSignIn("signin");
+    if (prompt.trim()) onRequestToSend();
   };
 
   const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -121,31 +129,134 @@ function LandingView({ onSignIn }: { onSignIn: (mode?: AuthMode) => void }) {
           </div>
         </div>
         <p className="composer-disclaimer">
-          Explore GuardAI freely. <button type="button" onClick={() => onSignIn("signup")}>Create an account</button> to start a protected conversation.
+          Guest preview · Sign in is required to send prompts. <button type="button" onClick={() => onSignIn("signup")}>Create a free account</button>.
         </p>
       </motion.form>
     </div>
   );
 }
 
+
+function GuestAccessDialog({
+  open,
+  onClose,
+  onCreateAccount,
+  onSignIn,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreateAccount: () => void;
+  onSignIn: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="guest-gate-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) onClose();
+          }}
+        >
+          <motion.section
+            className="guest-gate-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guest-gate-title"
+            initial={{ opacity: 0, y: 18, scale: .97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: .98 }}
+            transition={{ type: "spring", stiffness: 280, damping: 25 }}
+          >
+            <button className="icon-button guest-gate-close" onClick={onClose} aria-label="Close sign-in notice"><X size={18} /></button>
+            <div className="guest-gate-icon"><LockKeyhole size={25} /></div>
+            <span className="hero-kicker">ONE MORE STEP TO GET STARTED</span>
+            <h2 id="guest-gate-title">Sign in to send your prompt</h2>
+            <p className="guest-gate-description">
+              A GuardAI account is required to start protected AI processing, review detected information and save your secure conversation history.
+            </p>
+            <div className="guest-gate-assurance">
+              <span><ShieldCheck size={16} /> Your draft has not been sent to GuardAI or OpenAI.</span>
+              <span><Check size={16} /> It will remain here while you choose how to continue.</span>
+            </div>
+            <div className="guest-gate-actions">
+              <button className="primary-button guest-gate-primary" onClick={onCreateAccount}>
+                Create a free account <ArrowRight size={17} />
+              </button>
+              <button className="guest-gate-secondary" onClick={onSignIn}>
+                I already have an account <ArrowRight size={16} />
+              </button>
+              <button className="guest-gate-dismiss" onClick={onClose}>Continue exploring as a guest</button>
+            </div>
+            <div className="guest-gate-footnote"><ShieldCheck size={14} /> Protected processing starts after authentication.</div>
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function AboutView() {
+  const pillars = [
+    { number: "01", icon: <ShieldCheck size={20} />, title: "Detect with context", description: "Identify supported personal and organizational information in a submitted prompt." },
+    { number: "02", icon: <LockKeyhole size={20} />, title: "Protect before AI", description: "Replace detected values with temporary tokens before the request leaves the gateway." },
+    { number: "03", icon: <BarChart3 size={20} />, title: "Make protection visible", description: "Show users what was detected, what was masked and the risk assessment." },
+    { number: "04", icon: <Eye size={20} />, title: "Be transparent about limits", description: "Explain detection limits and never present automated masking as a guarantee of complete privacy." },
+  ];
+  const steps = ["Prompt submitted", "Sensitive data detected", "Sanitized request sent", "Response restored"];
+  const roles = [
+    { number: "01", role: "Frontend & experience", focus: "Interface, accessibility and interaction design" },
+    { number: "02", role: "Backend & AI integration", focus: "Gateway, data flow and model integration" },
+    { number: "03", role: "Privacy & quality", focus: "Detection rules, risk evaluation and testing" },
+  ];
+
   return (
     <div className="about-content">
-      <div className="about-heading">
-        <span className="hero-kicker">BUILT FOR A MORE PRIVATE AI FUTURE</span>
-        <h1>About <span>GuardAI</span></h1>
-        <p>
-          GuardAI is an academic software engineering project exploring how an intermediary privacy layer can reduce exposure of sensitive information when people use generative AI.
-        </p>
-      </div>
-      <div className="about-cards">
-        <article className="about-card"><ShieldCheck /><h3>Privacy by design</h3><p>Supported personal information is detected and replaced before prompts are sent to an external AI provider.</p></article>
-        <article className="about-card"><BarChart3 /><h3>Transparent protection</h3><p>Users can inspect what was detected, masked and assessed for risk after each request.</p></article>
-        <article className="about-card"><Globe2 /><h3>Responsible AI use</h3><p>The project makes privacy controls visible while documenting the limits of automated detection.</p></article>
-      </div>
-      <section className="team-placeholder">
-        <div><span className="hero-kicker">THE PEOPLE BEHIND THE PROJECT</span><h2>Project team</h2><p>Team names, registration numbers and academic details will be added after confirmation.</p></div>
-        <div className="team-note"><UserRound size={20} /><span>Three team members</span></div>
+      <motion.section className="about-hero" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45 }}>
+        <div className="about-hero-copy">
+          <span className="hero-kicker">THE PRIVACY LAYER FOR GENERATIVE AI</span>
+          <h1>Meet <span>GuardAI.</span></h1>
+          <p>Bring a privacy checkpoint to every AI conversation. GuardAI helps identify sensitive information, mask it before external processing and make each protection decision easier to understand.</p>
+        </div>
+        <div className="about-hero-visual" aria-hidden="true">
+          <div className="about-orbit about-orbit-a" /><div className="about-orbit about-orbit-b" />
+          <div className="about-hero-emblem"><ShieldCheck size={58} strokeWidth={1.45} /><Sparkles size={17} /></div>
+          <span className="about-visual-caption">PRIVACY · TRANSPARENCY · CONTROL</span>
+        </div>
+        <div className="about-meta-row">
+          <span><ShieldCheck size={14} /> Privacy-first architecture</span>
+          <span><Zap size={14} /> AI-assisted workflow</span>
+          <span><UserRound size={14} /> Three-person project team</span>
+        </div>
+      </motion.section>
+
+      <section className="about-section-block">
+        <div className="about-section-heading"><div><span className="section-eyebrow">WHAT MAKES IT DIFFERENT</span><h2>Protection you can actually see.</h2></div><span className="about-section-aside">Our four core principles</span></div>
+        <div className="about-pillar-grid">
+          {pillars.map((item, index) => (
+            <motion.article className="about-pillar-card" key={item.number} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .08 * index, duration: .38 }}>
+              <div className="pillar-card-top"><span className="pillar-icon">{item.icon}</span><span className="pillar-number">{item.number}</span></div>
+              <h3>{item.title}</h3><p>{item.description}</p>
+            </motion.article>
+          ))}
+        </div>
+      </section>
+
+      <section className="about-flow-section">
+        <div className="about-section-heading compact"><div><span className="section-eyebrow">HOW IT WORKS</span><h2>One protected journey.</h2></div><span className="about-section-aside">From prompt to response</span></div>
+        <div className="about-flow-track">
+          {steps.map((step, index) => <div className="about-flow-step" key={step}><span className="flow-step-number">0{index + 1}</span><span className="flow-step-dot" /><strong>{step}</strong>{index < steps.length - 1 && <span className="flow-step-line" />}</div>)}
+        </div>
+      </section>
+
+      <section className="about-team-section">
+        <div className="about-team-intro"><span className="section-eyebrow">THE PEOPLE BEHIND THE PROJECT</span><h2>Built by a team of three.</h2><p>One shared goal: make safer AI interactions easier to understand.</p><span className="team-academic-tag"><Globe2 size={13} /> Academic software engineering project</span></div>
+        <div className="about-role-grid">
+          {roles.map((item) => <article className="about-role-card" key={item.number}><span>{item.number}</span><div><strong>{item.role}</strong><small>{item.focus}</small></div></article>)}
+        </div>
+        <div className="about-team-note"><Info size={14} /><span>Member names, registration numbers and group details will be added after confirmation.</span></div>
       </section>
     </div>
   );
@@ -269,6 +380,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("dark");
+  const [draftPrompt, setDraftPrompt] = useState("");
+  const [guestGateOpen, setGuestGateOpen] = useState(false);
 
   const navigate = (next: View) => {
     setView(next);
@@ -356,13 +469,19 @@ export default function App() {
           </header>
           <AnimatePresence mode="wait">
             {view === "chat"
-              ? <motion.div key="chat" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><LandingView onSignIn={openAuth} /></motion.div>
+              ? <motion.div key="chat" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><LandingView onSignIn={openAuth} prompt={draftPrompt} setPrompt={setDraftPrompt} onRequestToSend={() => setGuestGateOpen(true)} /></motion.div>
               : <motion.div key="about" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AboutView /></motion.div>
             }
           </AnimatePresence>
           <footer className="page-footer"><span>GuardAI Gateway</span><span>Privacy-first AI · Academic prototype</span><span className="footer-status"><i /> Guest preview</span></footer>
         </main>
       </div>
+      <GuestAccessDialog
+        open={guestGateOpen}
+        onClose={() => setGuestGateOpen(false)}
+        onCreateAccount={() => { setGuestGateOpen(false); openAuth("signup"); }}
+        onSignIn={() => { setGuestGateOpen(false); openAuth("signin"); }}
+      />
     </div>
   );
 }
