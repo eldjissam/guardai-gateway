@@ -8,7 +8,7 @@ import { supabase } from "../../lib/supabase";
 import "./admin-dashboard.css";
 
 type Range = "7d" | "30d" | "all";
-type Tab = "overview" | "logs" | "users";
+export type AdminSection = "overview" | "logs" | "users";
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 type SecurityEvent = {
   id: string;
@@ -129,8 +129,10 @@ function MetricCard({
   );
 }
 
-export default function AdminDashboard() {
-  const [tab, setTab] = useState<Tab>("overview");
+export default function AdminDashboard({ activeTab, onTabChange }: { activeTab?: AdminSection; onTabChange?: (tab: AdminSection) => void } = {}) {
+  const [internalTab, setInternalTab] = useState<AdminSection>("overview");
+  const tab = activeTab ?? internalTab;
+  const setTab = onTabChange ?? setInternalTab;
   const [range, setRange] = useState<Range>("30d");
   const [metrics, setMetrics] = useState<Metrics>(EMPTY_METRICS);
   const [events, setEvents] = useState<SecurityEvent[]>([]);
@@ -222,11 +224,11 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <nav className="admin-tabs" aria-label="Admin sections">
+      {!onTabChange && <nav className="admin-tabs" aria-label="Admin sections">
         <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}><BarChart3 size={16} /> Overview</button>
         <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><Activity size={16} /> Security logs <span>{number(events.length)}</span></button>
         <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}><Users size={16} /> Users <span>{number(metrics.registeredUsers)}</span></button>
-      </nav>
+      </nav>}
 
       <div className="admin-toolbar">
         <div className="admin-data-caption"><Database size={14} /> Live database records · no sample metrics</div>

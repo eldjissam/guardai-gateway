@@ -10,6 +10,7 @@ import "./secure-chat.css";
 import "./secure-chat-quality.css";
 import "./history-management.css";
 
+import "./about-admin-layout-fixes.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>

@@ -1,0 +1,58 @@
+.guardai-admin-shell{--ga-950:#052b20;--ga-900:#073d2d;--ga-800:#0a4b37;--ga-700:#087653;--ga-600:#07966b;display:flex;width:100%;height:100dvh;min-height:0;overflow:hidden;color:#17352a;background:#f6faf7;color-scheme:light;isolation:isolate;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.guardai-admin-shell *{box-sizing:border-box}
+.ga-admin-sidebar{position:relative;z-index:30;display:flex;flex:0 0 270px;flex-direction:column;width:270px;min-width:0;height:100%;padding:22px 15px 15px;color:#e7f4ed;background:linear-gradient(180deg,#073e2e 0%,#062f23 62%,#05281e 100%);border-right:1px solid rgba(255,255,255,.08);transition:width .23s ease,flex-basis .23s ease;overflow:hidden}
+.ga-admin-sidebar.is-collapsed{flex-basis:78px;width:78px;padding-inline:11px}
+.ga-admin-brand-row{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 3px}
+.ga-admin-brand-mark{width:40px;height:40px;flex:0 0 auto;display:grid;place-items:center;border-radius:12px;color:#70e7b8;background:rgba(16,185,129,.15);border:1px solid rgba(110,231,183,.22)}
+.ga-admin-brand-copy{display:grid;gap:3px;min-width:0;flex:1}
+.ga-admin-brand-copy strong{color:#fff;font-size:21px;line-height:1;font-weight:800;letter-spacing:-.7px;white-space:nowrap}
+.ga-admin-brand-copy strong span{color:#65ddb0}
+.ga-admin-brand-copy small{color:#86b9a0;font-size:8px;font-weight:800;letter-spacing:1.4px}
+.ga-admin-icon-button{width:36px;height:36px;flex:0 0 auto;display:grid;place-items:center;padding:0;color:inherit;background:transparent;border:1px solid transparent;border-radius:10px;cursor:pointer}
+.ga-admin-icon-button:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12)}
+.ga-admin-collapse{margin-left:auto;color:#a7cbb8}
+.ga-admin-workspace-label{display:flex;align-items:center;gap:8px;margin:34px 9px 17px;color:#86b9a0;font-size:9px;font-weight:800;letter-spacing:1.3px;white-space:nowrap}
+.ga-admin-workspace-label i,.ga-admin-mode-pill i{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:#34d399;box-shadow:0 0 10px rgba(52,211,153,.5)}
+.ga-admin-nav{display:grid;gap:6px}
+.ga-admin-nav-label{padding:0 10px 8px;color:#78a890;font-size:9px;font-weight:800;letter-spacing:1.2px}
+.ga-admin-nav-item{position:relative;width:100%;min-height:61px;display:flex;align-items:center;gap:11px;padding:9px 10px;text-align:left;color:#c1d9cb;background:transparent;border:1px solid transparent;border-radius:12px;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease}
+.ga-admin-nav-item:hover{color:#fff;background:rgba(255,255,255,.075)}
+.ga-admin-nav-item.active{color:#fff;background:linear-gradient(100deg,rgba(16,185,129,.23),rgba(16,185,129,.08));border-color:rgba(110,231,183,.18);box-shadow:inset 3px 0 #34d399}
+.ga-admin-nav-icon{width:35px;height:35px;flex:0 0 auto;display:grid;place-items:center;border-radius:10px;color:#9ec9b1;background:rgba(255,255,255,.055)}
+.ga-admin-nav-item.active .ga-admin-nav-icon{color:#72e4b6;background:rgba(16,185,129,.17)}
+.ga-admin-nav-copy{min-width:0;flex:1;display:grid;gap:4px}
+.ga-admin-nav-copy b{font-size:11px;font-weight:750}
+.ga-admin-nav-copy small{overflow:hidden;color:#8eb49e;font-size:8px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.ga-admin-active-dot{width:6px;height:6px;border-radius:50%;background:#6ee7b7}
+.ga-admin-sidebar-spacer{flex:1;min-height:25px}
+.ga-admin-sidebar-bottom{display:grid;gap:13px}
+.ga-admin-back-button{display:flex;align-items:center;gap:10px;min-height:43px;padding:0 10px;color:#c3ddce;text-align:left;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.08);border-radius:11px;cursor:pointer;font-size:10px;font-weight:750;white-space:nowrap}
+.ga-admin-back-button:hover{color:#fff;background:rgba(255,255,255,.1)}
+.ga-admin-security-note{display:flex;align-items:flex-start;gap:8px;padding:11px 8px;color:#91baa2;font-size:9px;line-height:1.5;border-top:1px solid rgba(255,255,255,.09)}
+.ga-admin-security-note svg{flex:0 0 auto;color:#62d9a9}
+.ga-admin-account{display:flex;align-items:center;gap:9px;min-width:0;padding:12px 7px 2px;border-top:1px solid rgba(255,255,255,.1)}
+.ga-admin-avatar{width:35px;height:35px;flex:0 0 auto;display:grid;place-items:center;border-radius:50%;color:#064331;background:#9be8c5;font-size:13px;font-weight:850}
+.ga-admin-account-copy{min-width:0;flex:1;display:grid;gap:4px}
+.ga-admin-account-copy b{overflow:hidden;color:#fff;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.ga-admin-account-copy small{overflow:hidden;color:#8fb6a0;font-size:8px;text-overflow:ellipsis;white-space:nowrap}
+.ga-admin-role{padding:4px 6px;color:#8af0c2;background:rgba(16,185,129,.15);border-radius:6px;font-size:7px;font-weight:900;letter-spacing:.5px}
+.ga-admin-main{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;height:100%;overflow:hidden;background:#f6faf7}
+.ga-admin-topbar{position:relative;z-index:5;display:flex;flex:0 0 68px;align-items:center;justify-content:space-between;gap:14px;min-width:0;padding:0 clamp(18px,3vw,38px);background:#fff;border-bottom:1px solid #e7eee9;box-shadow:0 2px 10px rgba(20,60,40,.025)}
+.ga-admin-topbar-left,.ga-admin-topbar-actions{display:flex;align-items:center;gap:12px;min-width:0}
+.ga-admin-breadcrumb{display:flex;align-items:center;gap:9px;color:#8a9b91;font-size:11px;white-space:nowrap}
+.ga-admin-breadcrumb i{color:#bdc9c1;font-style:normal}
+.ga-admin-breadcrumb b{color:#647b70;font-weight:600}
+.ga-admin-breadcrumb strong{color:#274c3c;font-weight:800}
+.ga-admin-mode-pill{display:flex;align-items:center;gap:8px;padding:8px 11px;color:#167451;background:#eff9f3;border:1px solid #d8eee1;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.5px;white-space:nowrap}
+.ga-admin-signout{display:flex;align-items:center;justify-content:center;gap:8px;min-height:39px;padding:0 15px;color:#fff;background:#087c58;border:1px solid #087c58;border-radius:10px;font-size:10px;font-weight:800;cursor:pointer;transition:background .16s ease,transform .16s ease}
+.ga-admin-signout:hover{background:#066647;transform:translateY(-1px)}
+.ga-admin-content{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;padding:29px clamp(18px,3vw,40px) 20px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#bdd9c8 transparent}
+.ga-admin-content::-webkit-scrollbar{width:9px}.ga-admin-content::-webkit-scrollbar-thumb{background:#c3ddcf;border:2px solid #f6faf7;border-radius:20px}
+.ga-admin-footer{display:flex;justify-content:space-between;gap:12px;padding:19px 2px 4px;color:#84958b;font-size:9px}
+.ga-admin-footer span:first-child{display:flex;align-items:center;gap:7px}.ga-admin-footer svg{color:#07966b}
+.ga-desktop-only{display:grid}.ga-mobile-only{display:none}
+@media(max-width:900px){.ga-admin-sidebar{flex-basis:240px;width:240px}.ga-admin-sidebar.is-collapsed{flex-basis:74px;width:74px}.ga-admin-content{padding:22px 20px 18px}}
+@media(max-width:700px){.ga-admin-sidebar{position:fixed;inset:0 auto 0 0;z-index:42;width:min(84vw,310px);flex-basis:min(84vw,310px);transform:translateX(-105%);transition:transform .26s cubic-bezier(.22,1,.36,1);box-shadow:20px 0 55px rgba(0,0,0,.22)}.ga-admin-sidebar.is-mobile-open{transform:translateX(0)}.ga-admin-sidebar.is-collapsed{width:min(84vw,310px);flex-basis:min(84vw,310px);padding-inline:15px}.ga-admin-sidebar.is-collapsed .ga-admin-brand-copy,.ga-admin-sidebar.is-collapsed .ga-admin-nav-label,.ga-admin-sidebar.is-collapsed .ga-admin-nav-copy,.ga-admin-sidebar.is-collapsed .ga-admin-workspace-label,.ga-admin-sidebar.is-collapsed .ga-admin-security-note,.ga-admin-sidebar.is-collapsed .ga-admin-account-copy,.ga-admin-sidebar.is-collapsed .ga-admin-role,.ga-admin-sidebar.is-collapsed .ga-admin-back-button span{display:initial}.ga-admin-sidebar.is-collapsed .ga-admin-nav-item{justify-content:flex-start;min-height:61px;padding-inline:10px}.ga-admin-scrim{position:fixed;inset:0;z-index:41;border:0;background:rgba(3,17,11,.56);backdrop-filter:blur(3px)}.ga-admin-topbar{flex-basis:60px;padding-inline:13px}.ga-admin-breadcrumb{font-size:9px;gap:6px}.ga-admin-mode-pill{display:none}.ga-admin-content{padding:18px 13px max(20px,env(safe-area-inset-bottom))}.ga-admin-footer{flex-direction:column;font-size:8px}.ga-desktop-only{display:none}.ga-mobile-only{display:grid;color:#315846}.ga-open-menu{color:#315846}}
+@media(max-width:380px){.ga-admin-signout{min-height:35px;padding-inline:10px;font-size:9px}.ga-admin-topbar-left,.ga-admin-topbar-actions{gap:7px}}
+@media(prefers-reduced-motion:reduce){.ga-admin-sidebar,.ga-admin-signout{transition:none}}
+.ga-admin-verifying{width:100%;height:100dvh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#526d5e;background:#f6faf7;font-size:11px}.ga-admin-verifying-mark{color:#087c58;font-size:22px;font-weight:850;letter-spacing:-.6px}.ga-admin-verifying p{margin:0}

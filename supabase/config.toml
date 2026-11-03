@@ -18,3 +18,9 @@ port = 54323
 
 [functions.secure-chat]
 verify_jwt = true
+
+[functions.admin-manage-users]
+verify_jwt = true
+
+[functions.delete-my-account]
+verify_jwt = true

@@ -3,17 +3,20 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight, ArrowUp, BarChart3, Check, ChevronDown, Info, LockKeyhole,
   Menu, MessageSquare, Moon, PanelLeftClose, PanelLeftOpen, Plus, Shield,
-  ShieldCheck, Sparkles, Sun, UserRound, X, Zap, Globe2, Eye, EyeOff,
+  ShieldCheck, Sparkles, Sun, UserRound, X, Zap, Eye, EyeOff,
   Mail, KeyRound, ArrowLeft, LogOut, CircleCheck,
 } from "lucide-react";
 import { useAuth } from "./contexts/AuthContext";
 import { useChatSessions } from "./contexts/ChatSessionContext";
 import SecureChatWorkspace from "./components/chat/SecureChatWorkspace";
-import AdminDashboard from "./components/admin/AdminDashboard";
+import UserProfilePage from "./components/profile/UserProfilePage";
+import AdminShell from "./components/admin/AdminShell";
+import SignOutConfirmDialog from "./components/shared/SignOutConfirmDialog";
 import { supabase } from "./lib/supabase";
 import ChatHistoryList from "./components/layout/ChatHistoryList";
 
-type View = "chat" | "about" | "signin" | "signup" | "reset" | "workspace" | "admin";
+import PublicProjectTeam from "./components/about/PublicProjectTeam";
+type View = "chat" | "about" | "signin" | "signup" | "reset" | "workspace" | "admin" | "profile";
 type AuthMode = "signin" | "signup";
 type Theme = "dark" | "light";
 
@@ -212,11 +215,6 @@ function AboutView() {
     { number: "04", icon: <Eye size={20} />, title: "Be transparent about limits", description: "Explain detection limits and never present automated masking as a guarantee of complete privacy." },
   ];
   const steps = ["Prompt submitted", "Sensitive data detected", "Sanitized request sent", "Response restored"];
-  const roles = [
-    { number: "01", role: "Frontend & experience", focus: "Interface, accessibility and interaction design" },
-    { number: "02", role: "Backend & AI integration", focus: "Gateway, data flow and model integration" },
-    { number: "03", role: "Privacy & quality", focus: "Detection rules, risk evaluation and testing" },
-  ];
 
   return (
     <div className="about-content">
@@ -258,11 +256,7 @@ function AboutView() {
       </section>
 
       <section className="about-team-section">
-        <div className="about-team-intro"><span className="section-eyebrow">THE PEOPLE BEHIND THE PROJECT</span><h2>Built by a team of three.</h2><p>One shared goal: make safer AI interactions easier to understand.</p><span className="team-academic-tag"><Globe2 size={13} /> Academic software engineering project</span></div>
-        <div className="about-role-grid">
-          {roles.map((item) => <article className="about-role-card" key={item.number}><span>{item.number}</span><div><strong>{item.role}</strong><small>{item.focus}</small></div></article>)}
-        </div>
-        <div className="about-team-note"><Info size={14} /><span>Member names, registration numbers and group details will be added after confirmation.</span></div>
+        <PublicProjectTeam />
       </section>
     </div>
   );
@@ -510,6 +504,8 @@ export default function App() {
   const [draftPrompt, setDraftPrompt] = useState("");
   const [guestGateOpen, setGuestGateOpen] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+  const [signOutDialogOpen, setSignOutDialogOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const { user, loading: authLoading, authEvent, signOut } = useAuth();
   const { activeSessionId, setActiveSessionId, setSessions } = useChatSessions();
   const [profileRole, setProfileRole] = useState<string | null>(null);
@@ -570,8 +566,11 @@ export default function App() {
   };
   const clearConfirmationEmail = () => setConfirmationEmail(null);
   const handleSignOut = async () => {
-    try { await signOut(); setGuestGateOpen(false); navigate("chat"); }
+    if (signingOut) return;
+    setSigningOut(true);
+    try { await signOut(); setGuestGateOpen(false); setSignOutDialogOpen(false); navigate("chat"); }
     catch (error) { console.error("Sign out failed", error); }
+    finally { setSigningOut(false); }
   };
   const handleAuthenticated = () => navigate("workspace");
 
@@ -611,6 +610,19 @@ export default function App() {
     );
   }
 
+  if (view === "admin" && user && profileLoading) {
+    return <div className="ga-admin-verifying"><span /> Verifying administrator permissions…</div>;
+  }
+
+  if (view === "admin" && user && isAdmin) {
+    return (
+      <>
+        <AdminShell user={user} onBackToWorkspace={() => navigate("workspace")} onSignOutRequest={() => setSignOutDialogOpen(true)} />
+        <SignOutConfirmDialog open={signOutDialogOpen} busy={signingOut} onCancel={() => setSignOutDialogOpen(false)} onConfirm={() => void handleSignOut()} />
+      </>
+    );
+  }
+
   return (
     <div className="app-shell" data-theme={theme}>
       <AnimatedBackdrop />
@@ -632,7 +644,7 @@ export default function App() {
             <div className="sidebar-promo"><div className="promo-icon"><ShieldCheck size={20} /></div><strong>Your privacy comes first</strong><p>Detect sensitive data. Mask it before AI processing. Stay in control.</p><div className="promo-points"><span><Check size={13} /> Data masking</span><span><Check size={13} /> Risk insights</span></div></div>
           </>}
           <div className="sidebar-bottom">
-            <button className="profile-entry" onClick={() => user ? navigate("workspace") : openAuth("signin")}>
+            <button className="profile-entry" onClick={() => user ? navigate("profile") : openAuth("signin")}>
               <span className="avatar-placeholder"><UserRound size={17} /></span>
               {!sidebarCollapsed && <span className="profile-copy"><strong>{user ? (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "GuardAI member") : "Guest workspace"}</strong><small>{user?.email ?? "Sign in to save your chats"}</small></span>}
               {!sidebarCollapsed && <ChevronDown size={15} className="muted-icon" />}
@@ -642,23 +654,24 @@ export default function App() {
 
         <main className="main-panel">
           <header className="topbar">
-            <div className="topbar-left"><button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><span className="mobile-brand"><Brand /></span><span className="topbar-context">{view === "chat" ? "Private AI workspace" : view === "workspace" ? "Your authenticated workspace" : view === "admin" ? "Security operations" : "Discover GuardAI"}</span></div>
+            <div className="topbar-left"><button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><span className="mobile-brand"><Brand /></span><span className="topbar-context">{view === "chat" ? "Private AI workspace" : view === "workspace" ? "Your authenticated workspace" : view === "profile" ? "Your profile" : view === "admin" ? "Security operations" : "Discover GuardAI"}</span></div>
             <div className="topbar-actions">
               <span className="protection-pill"><i /> Privacy layer ready</span>
               <button className="icon-button theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
-              {user ? <button className="primary-button top-signin" onClick={handleSignOut}><LogOut size={15} /> Sign out</button> : <button className="primary-button top-signin" onClick={() => openAuth("signin")}>Sign in <ArrowRight size={15} /></button>}
+              {user ? <button className="primary-button top-signin" onClick={() => setSignOutDialogOpen(true)}><LogOut size={15} /> Sign out</button> : <button className="primary-button top-signin" onClick={() => openAuth("signin")}>Sign in <ArrowRight size={15} /></button>}
             </div>
           </header>
           <AnimatePresence mode="wait">
             {view === "chat" && <motion.div key="chat" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><LandingView onSignIn={openAuth} prompt={draftPrompt} setPrompt={setDraftPrompt} onRequestToSend={() => user ? navigate("workspace") : setGuestGateOpen(true)} /></motion.div>}
             {view === "about" && <motion.div key="about" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AboutView /></motion.div>}
-            {view === "admin" && user && isAdmin && <motion.div key="admin" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AdminDashboard /></motion.div>}
             {view === "workspace" && user && <motion.div key="workspace" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AuthenticatedWorkspaceView user={user} draftPrompt={draftPrompt} onSignOut={handleSignOut} /></motion.div>}
-          </AnimatePresence>
+                      {view === "profile" && user && <motion.div key="profile" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><UserProfilePage user={user} onBack={() => navigate("workspace")} /></motion.div>}
+</AnimatePresence>
           <footer className="page-footer"><span>GuardAI Gateway</span><span>Privacy-first AI · Academic prototype</span><span className="footer-status"><i /> {user ? "Authenticated session" : "Guest preview"}</span></footer>
         </main>
       </div>
       <GuestAccessDialog open={guestGateOpen && !user} onClose={() => setGuestGateOpen(false)} onCreateAccount={() => { setGuestGateOpen(false); openAuth("signup"); }} onSignIn={() => { setGuestGateOpen(false); openAuth("signin"); }} />
+      <SignOutConfirmDialog open={signOutDialogOpen} busy={signingOut} onCancel={() => setSignOutDialogOpen(false)} onConfirm={() => void handleSignOut()} />
     </div>
   );
 }
