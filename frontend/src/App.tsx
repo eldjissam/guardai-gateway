@@ -9,9 +9,11 @@ import {
 import { useAuth } from "./contexts/AuthContext";
 import { useChatSessions } from "./contexts/ChatSessionContext";
 import SecureChatWorkspace from "./components/chat/SecureChatWorkspace";
+import AdminDashboard from "./components/admin/AdminDashboard";
+import { supabase } from "./lib/supabase";
 import ChatHistoryList from "./components/layout/ChatHistoryList";
 
-type View = "chat" | "about" | "signin" | "signup" | "reset" | "workspace";
+type View = "chat" | "about" | "signin" | "signup" | "reset" | "workspace" | "admin";
 type AuthMode = "signin" | "signup";
 type Theme = "dark" | "light";
 
@@ -510,6 +512,37 @@ export default function App() {
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const { user, loading: authLoading, authEvent, signOut } = useAuth();
   const { activeSessionId, setActiveSessionId, setSessions } = useChatSessions();
+  const [profileRole, setProfileRole] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const isAdmin = profileRole === "admin";
+  const client = supabase;
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setProfileRole(null);
+      setProfileLoading(false);
+      return;
+    }
+
+    if (!client) {
+      setProfileRole(null);
+      setProfileLoading(false);
+      return;
+    }
+    setProfileLoading(true);
+    const loadRole = async () => {
+      const { data, error } = await client
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      setProfileRole(error ? null : (data?.role ?? "user"));
+      setProfileLoading(false);
+    };
+    void loadRole();
+    return () => { cancelled = true; };
+  }, [user?.id]);
   const previousUserId = useRef<string | null>(null);
   useEffect(() => {
     const currentUserId = user?.id ?? null;
@@ -522,6 +555,11 @@ export default function App() {
   const recoveryEventHandled = useRef(false);
 
   const navigate = (next: View) => { setView(next); setSidebarOpen(false); };
+  useEffect(() => {
+    if (view !== "admin") return;
+    if (!user) setView("chat");
+    else if (!profileLoading && profileRole !== "admin") setView("workspace");
+  }, [view, user, profileLoading, profileRole]);
   const openAuth = (mode: AuthMode = "signin") => {
     if (mode === "signup") setConfirmationEmail(null);
     navigate(mode);
@@ -587,6 +625,7 @@ export default function App() {
           <div className="sidebar-actions">
             <button className="new-chat-button" onClick={() => { setActiveSessionId(null); setDraftPrompt(""); navigate(user ? "workspace" : "chat"); }}><Plus size={18} /><span>New chat</span><kbd>⌘ K</kbd></button>
             <button className={`nav-button ${view === "about" ? "nav-active" : ""}`} onClick={() => navigate("about")}><Info size={18} /><span>About GuardAI</span></button>
+            {isAdmin && <button className={`nav-button ${view === "admin" ? "nav-active" : ""}`} onClick={() => navigate("admin")}><ShieldCheck size={18} /><span>Admin Control Center</span></button>}
           </div>
           {!sidebarCollapsed && <>
             <div className="sidebar-section">{user ? <ChatHistoryList activeSessionId={activeSessionId} onSelect={(sessionId) => { setActiveSessionId(sessionId); navigate("workspace"); }} /> : <><div className="section-label">RECENT CHATS</div><div className="history-empty"><MessageSquare size={19} /><span>Your conversations will appear here after you sign in.</span></div></>}</div>
@@ -603,7 +642,7 @@ export default function App() {
 
         <main className="main-panel">
           <header className="topbar">
-            <div className="topbar-left"><button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><span className="mobile-brand"><Brand /></span><span className="topbar-context">{view === "chat" ? "Private AI workspace" : view === "workspace" ? "Your authenticated workspace" : "Discover GuardAI"}</span></div>
+            <div className="topbar-left"><button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><span className="mobile-brand"><Brand /></span><span className="topbar-context">{view === "chat" ? "Private AI workspace" : view === "workspace" ? "Your authenticated workspace" : view === "admin" ? "Security operations" : "Discover GuardAI"}</span></div>
             <div className="topbar-actions">
               <span className="protection-pill"><i /> Privacy layer ready</span>
               <button className="icon-button theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
@@ -613,6 +652,7 @@ export default function App() {
           <AnimatePresence mode="wait">
             {view === "chat" && <motion.div key="chat" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><LandingView onSignIn={openAuth} prompt={draftPrompt} setPrompt={setDraftPrompt} onRequestToSend={() => user ? navigate("workspace") : setGuestGateOpen(true)} /></motion.div>}
             {view === "about" && <motion.div key="about" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AboutView /></motion.div>}
+            {view === "admin" && user && isAdmin && <motion.div key="admin" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AdminDashboard /></motion.div>}
             {view === "workspace" && user && <motion.div key="workspace" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AuthenticatedWorkspaceView user={user} draftPrompt={draftPrompt} onSignOut={handleSignOut} /></motion.div>}
           </AnimatePresence>
           <footer className="page-footer"><span>GuardAI Gateway</span><span>Privacy-first AI · Academic prototype</span><span className="footer-status"><i /> {user ? "Authenticated session" : "Guest preview"}</span></footer>
