@@ -129,3 +129,69 @@
   .secure-composer-caption { font-size: 7px; }
 }
 @media (prefers-reduced-motion: reduce) { .secure-processing-pulse, .secure-spinner { animation: none !important; } }
+
+/* Workspace metadata is integrated into the application navbar to preserve chat height. */
+.workspace-topbar-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  max-width: min(58vw, 650px);
+}
+.workspace-topbar-eyebrow {
+  color: #59c999;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.35px;
+  line-height: 1.2;
+}
+.workspace-topbar-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font: 600 13px/1.25 "Space Grotesk", sans-serif;
+  letter-spacing: -.2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-topbar-description {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-new-chat-button {
+  min-height: 35px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color .2s ease, border-color .2s ease, background .2s ease;
+}
+.workspace-new-chat-button:hover {
+  color: var(--text);
+  border-color: rgba(52, 211, 153, .36);
+  background: var(--panel-soft);
+}
+.workspace-new-chat-button svg { color: #5ee0a7; }
+
+@media (max-width: 700px) {
+  .main-panel-workspace .mobile-brand { display: none; }
+  .main-panel-workspace .topbar-left { flex: 1 1 auto; }
+  .workspace-topbar-copy { max-width: min(28vw, 120px); gap: 1px; }
+  .workspace-topbar-eyebrow { font-size: 7px; letter-spacing: 1px; }
+  .workspace-topbar-title { font-size: 11px; }
+  .workspace-topbar-description { display: none; }
+  .workspace-new-chat-button { width: 34px; min-height: 34px; padding: 0; }
+  .workspace-new-chat-button span { display: none; }
+  .main-panel-workspace .topbar-actions { gap: 5px; }
+}

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ArrowUp, Check, ChevronDown, ChevronUp, Clock3, Copy, LoaderCircle, LockKeyhole, MessageSquareText, ShieldAlert, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, ChevronUp, Clock3, Copy, LoaderCircle, LockKeyhole, ShieldAlert, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import { useChatSessions } from "../../contexts/ChatSessionContext";
@@ -127,7 +127,7 @@ function SecurityInspection({ message, security }: { message: string; security: 
 }
 
 export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props) {
-  const { sessions, setSessions, activeSessionId, setActiveSessionId } = useChatSessions();
+  const { setSessions, activeSessionId, setActiveSessionId } = useChatSessions();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState(initialDraftPrompt);
   const [sending, setSending] = useState(false);
@@ -188,7 +188,6 @@ export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props)
     list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [messages, sending]);
 
-  const activeTitle = useMemo(() => sessions.find((session) => session.id === activeSessionId)?.title ?? "New secure conversation", [activeSessionId, sessions]);
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -234,23 +233,10 @@ export default function SecureChatWorkspace({ user, initialDraftPrompt }: Props)
   const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); }
   };
-  const startNewChat = () => { setActiveSessionId(null); setMessages([]); setDraft(""); setError(null); textareaRef.current?.focus(); };
 
   return (
     <div className="secure-chat-workspace">
-      <header className="secure-chat-heading">
-        <div className="secure-chat-heading-copy">
-          <span className="hero-kicker">PRIVATE AI WORKSPACE</span>
-          <h1>{activeTitle}</h1>
-          <p>GuardAI inspects and sanitizes your prompt before it reaches the AI provider.</p>
-        </div>
-        <div className="secure-chat-heading-actions">
-          <span className="secure-chat-online"><i /> Protection pipeline</span>
-          <button className="secure-new-chat-inline" onClick={startNewChat}><MessageSquareText size={15} /> New chat</button>
-        </div>
-      </header>
-
-      <div className="secure-chat-body">
+<div className="secure-chat-body">
         <div className="secure-message-list" aria-live="polite" ref={messageListRef}>
           {loadingHistory && <div className="secure-chat-loading"><LoaderCircle size={17} /> Loading sanitized conversation…</div>}
           {!loadingHistory && messages.length === 0 && (

@@ -457,7 +457,7 @@ function AuthPage({ mode, onMode, onBack, onAuthenticated, confirmationEmail, on
 
             <div className="auth-page-switch">
               {isReset ? "Remembered your password?" : isSignup ? "Already have an account?" : "New to GuardAI?"}
-              <button onClick={() => { setNotice(null); onMode("signin"); }}>
+              <button onClick={() => { setNotice(null); onMode(isSignup || isReset ? "signin" : "signup"); }}>
                 {isReset ? "Back to sign in" : isSignup ? "Sign in" : "Create account"}
               </button>
             </div>
@@ -502,15 +502,17 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("dark");
   const [draftPrompt, setDraftPrompt] = useState("");
+  const [workspaceResetKey, setWorkspaceResetKey] = useState(0);
   const [guestGateOpen, setGuestGateOpen] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const [signOutDialogOpen, setSignOutDialogOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const { user, loading: authLoading, authEvent, signOut } = useAuth();
-  const { activeSessionId, setActiveSessionId, setSessions } = useChatSessions();
+  const { sessions, activeSessionId, setActiveSessionId, setSessions } = useChatSessions();
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const isAdmin = profileRole === "admin";
+  const activeWorkspaceTitle = sessions.find((session) => session.id === activeSessionId)?.title ?? "New secure conversation";
   const client = supabase;
   useEffect(() => {
     let cancelled = false;
@@ -551,6 +553,16 @@ export default function App() {
   const recoveryEventHandled = useRef(false);
 
   const navigate = (next: View) => { setView(next); setSidebarOpen(false); };
+  const handleNewChat = () => {
+    setActiveSessionId(null);
+    setDraftPrompt("");
+    if (user) {
+      setWorkspaceResetKey((current) => current + 1);
+      navigate("workspace");
+    } else {
+      navigate("chat");
+    }
+  };
   useEffect(() => {
     if (view !== "admin") return;
     if (!user) setView("chat");
@@ -635,7 +647,7 @@ export default function App() {
             <button className="icon-button mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={18} /></button>
           </div>
           <div className="sidebar-actions">
-            <button className="new-chat-button" onClick={() => { setActiveSessionId(null); setDraftPrompt(""); navigate(user ? "workspace" : "chat"); }}><Plus size={18} /><span>New chat</span><kbd>⌘ K</kbd></button>
+            <button className="new-chat-button" onClick={handleNewChat}><Plus size={18} /><span>New chat</span><kbd>⌘ K</kbd></button>
             <button className={`nav-button ${view === "about" ? "nav-active" : ""}`} onClick={() => navigate("about")}><Info size={18} /><span>About GuardAI</span></button>
             {isAdmin && <button className={`nav-button ${view === "admin" ? "nav-active" : ""}`} onClick={() => navigate("admin")}><ShieldCheck size={18} /><span>Admin Control Center</span></button>}
           </div>
@@ -652,10 +664,23 @@ export default function App() {
           </div>
         </motion.aside>
 
-        <main className="main-panel">
+        <main className={`main-panel ${view === "workspace" ? "main-panel-workspace" : ""}`}>
           <header className="topbar">
-            <div className="topbar-left"><button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><span className="mobile-brand"><Brand /></span><span className="topbar-context">{view === "chat" ? "Private AI workspace" : view === "workspace" ? "Your authenticated workspace" : view === "profile" ? "Your profile" : view === "admin" ? "Security operations" : "Discover GuardAI"}</span></div>
+            <div className="topbar-left">
+              <button className="icon-button mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>
+              <span className="mobile-brand"><Brand /></span>
+              {view === "workspace" && user ? (
+                <div className="workspace-topbar-copy" aria-label="Current secure conversation">
+                  <span className="workspace-topbar-eyebrow">PRIVATE AI WORKSPACE</span>
+                  <strong className="workspace-topbar-title">{activeWorkspaceTitle}</strong>
+                  <span className="workspace-topbar-description">GuardAI inspects and sanitizes your prompt before it reaches the AI provider.</span>
+                </div>
+              ) : (
+                <span className="topbar-context">{view === "chat" ? "Private AI workspace" : view === "profile" ? "Your profile" : view === "admin" ? "Security operations" : "Discover GuardAI"}</span>
+              )}
+            </div>
             <div className="topbar-actions">
+              {view === "workspace" && user && <button type="button" className="workspace-new-chat-button" onClick={handleNewChat}><Plus size={15} /><span>New chat</span></button>}
               <span className="protection-pill"><i /> Privacy layer ready</span>
               <button className="icon-button theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle color theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
               {user ? <button className="primary-button top-signin" onClick={() => setSignOutDialogOpen(true)}><LogOut size={15} /> Sign out</button> : <button className="primary-button top-signin" onClick={() => openAuth("signin")}>Sign in <ArrowRight size={15} /></button>}
@@ -664,7 +689,7 @@ export default function App() {
           <AnimatePresence mode="wait">
             {view === "chat" && <motion.div key="chat" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><LandingView onSignIn={openAuth} prompt={draftPrompt} setPrompt={setDraftPrompt} onRequestToSend={() => user ? navigate("workspace") : setGuestGateOpen(true)} /></motion.div>}
             {view === "about" && <motion.div key="about" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AboutView /></motion.div>}
-            {view === "workspace" && user && <motion.div key="workspace" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AuthenticatedWorkspaceView user={user} draftPrompt={draftPrompt} onSignOut={handleSignOut} /></motion.div>}
+            {view === "workspace" && user && <motion.div key="workspace" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><AuthenticatedWorkspaceView key={workspaceResetKey} user={user} draftPrompt={draftPrompt} onSignOut={handleSignOut} /></motion.div>}
                       {view === "profile" && user && <motion.div key="profile" className="view-transition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}><UserProfilePage user={user} onBack={() => navigate("workspace")} /></motion.div>}
 </AnimatePresence>
           <footer className="page-footer"><span>GuardAI Gateway</span><span>Privacy-first AI · Academic prototype</span><span className="footer-status"><i /> {user ? "Authenticated session" : "Guest preview"}</span></footer>
