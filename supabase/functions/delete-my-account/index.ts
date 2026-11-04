@@ -86,29 +86,16 @@ Deno.serve(async (request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Never allow self-service deletion to remove the final administrator account.
-  const { data: ownProfile, error: ownProfileError } = await adminClient
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (ownProfileError) {
-    console.error("Could not verify account role before account deletion:", ownProfileError.message);
-    return json({ error: "GuardAI could not verify your account permissions. No deletion was completed." }, 500, cors);
-  }
-  if (ownProfile?.role === "admin") {
-    const { count, error: adminCountError } = await adminClient
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "admin");
-    if (adminCountError) {
-      console.error("Could not count administrator accounts before account deletion:", adminCountError.message);
-      return json({ error: "GuardAI could not verify administrator coverage. No deletion was completed." }, 500, cors);
-    }
-    if ((count ?? 0) <= 1) {
+  // The database RPC serializes administrator removals and prevents a last-admin race.
+  const { data: allowedToDelete, error: guardError } = await adminClient.rpc("guardai_prepare_account_deletion", { p_user_id: user.id });
+  if (guardError) {
+    if (String(guardError.message ?? "").includes("LAST_GUARDAI_ADMIN")) {
       return json({ error: "This is the last administrator account. Promote another trusted administrator before deleting this account." }, 409, cors);
     }
+    console.error("Could not safely authorize account deletion:", guardError.message);
+    return json({ error: "GuardAI could not verify administrator coverage. No deletion was completed." }, 500, cors);
   }
+  if (allowedToDelete !== true) return json({ error: "The account could not be found." }, 404, cors);
 
   // Avatar objects are owned by the account and must be removed before deleting the Auth user.
   const { error: avatarError } = await adminClient.storage.from("user-avatars").remove([`${user.id}/avatar`]);

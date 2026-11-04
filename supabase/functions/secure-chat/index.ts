@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { detectSensitiveSpans } from "./modules/detector.ts";
 import { tokenizePrompt } from "./modules/tokenizer.ts";
 import { calculateRisk, countEntities } from "./modules/risk-engine.ts";
-import { containsUnresolvedGuardToken, restoreKnownTokens } from "./modules/restoration.ts";
+import { containsUnresolvedGuardToken, maskUnresolvedGuardTokens, restoreKnownTokens } from "./modules/restoration.ts";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:5173",
@@ -291,8 +291,10 @@ Deno.serve(async (request: Request) => {
       .trim();
     if (!sanitizedAssistantMessage) throw new Error("EMPTY_AI_RESPONSE");
 
-    const assistantMessage = restoreKnownTokens(sanitizedAssistantMessage, tokenized.mapping);
-    const restorationWarning = containsUnresolvedGuardToken(assistantMessage);
+    const restoredAssistantMessage = restoreKnownTokens(sanitizedAssistantMessage, tokenized.mapping);
+    const restorationWarning = containsUnresolvedGuardToken(restoredAssistantMessage);
+    // Only current-request tokens are restored. Any model-repeated historical/unknown token is hidden.
+    const assistantMessage = maskUnresolvedGuardTokens(restoredAssistantMessage);
     const finalSessionId = sessionId ?? crypto.randomUUID();
 
     if (!sessionId) {

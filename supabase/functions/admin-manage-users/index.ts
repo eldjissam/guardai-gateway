@@ -109,28 +109,24 @@ Deno.serve(async (request: Request) => {
     if (body.action === "set_role") {
       const role = body.role === "admin" ? "admin" : body.role === "user" ? "user" : null;
       if (!role) return json({ error: "The requested role is not supported." }, 400, cors);
-      const { data: target, error: targetError } = await admin.from("profiles").select("id,role").eq("id", userId).maybeSingle();
-      if (targetError || !target) return json({ error: "The account was not found." }, 404, cors);
-      if (target.role === "admin" && role === "user") {
-        const { count, error: countError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "admin");
-        if (countError) return json({ error: "Administrator count could not be verified." }, 500, cors);
-        if ((count ?? 0) <= 1) return json({ error: "The last administrator cannot be demoted." }, 400, cors);
+      const { data: updated, error } = await admin.rpc("guardai_set_profile_role", { p_user_id: userId, p_role: role });
+      if (error) {
+        if (String(error.message ?? "").includes("LAST_GUARDAI_ADMIN")) return json({ error: "The last administrator cannot be demoted." }, 409, cors);
+        return json({ error: "The account role could not be updated." }, 500, cors);
       }
-      const { error } = await admin.from("profiles").update({ role }).eq("id", userId);
-      if (error) return json({ error: "The account role could not be updated." }, 500, cors);
+      if (updated !== true) return json({ error: "The account was not found." }, 404, cors);
       return json({ success: true, message: "Account role updated." }, 200, cors);
     }
 
     if (body.action === "delete") {
-      const { data: target, error: targetError } = await admin.from("profiles").select("id,role").eq("id", userId).maybeSingle();
-      if (targetError || !target) return json({ error: "The account was not found." }, 404, cors);
-      if (target.role === "admin") {
-        const { count, error: countError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "admin");
-        if (countError) return json({ error: "Administrator count could not be verified." }, 500, cors);
-        if ((count ?? 0) <= 1) return json({ error: "The last administrator account cannot be deleted." }, 400, cors);
+      const { data: allowedToDelete, error: guardError } = await admin.rpc("guardai_prepare_account_deletion", { p_user_id: userId });
+      if (guardError) {
+        if (String(guardError.message ?? "").includes("LAST_GUARDAI_ADMIN")) return json({ error: "The last administrator account cannot be deleted." }, 409, cors);
+        return json({ error: "Account deletion could not be safely authorized." }, 500, cors);
       }
+      if (allowedToDelete !== true) return json({ error: "The account was not found." }, 404, cors);
       const { error } = await admin.auth.admin.deleteUser(userId);
-      if (error) return json({ error: "The account could not be deleted." }, 500, cors);
+      if (error) return json({ error: "The account could not be deleted. If it was an administrator, its role was safely revoked first." }, 500, cors);
       return json({ success: true, message: "Account deleted." }, 200, cors);
     }
 

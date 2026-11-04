@@ -9,7 +9,10 @@
     "dev": "npm run dev --workspace @guardai/frontend",
     "build": "npm run build --workspace @guardai/frontend",
     "typecheck": "npm run typecheck --workspace @guardai/frontend",
-    "preview": "npm run preview --workspace @guardai/frontend"
+    "preview": "npm run preview --workspace @guardai/frontend",
+    "qa:unit": "node --test supabase/functions/secure-chat/modules/security.test.ts",
+    "qa:security": "node tools/qa/guardai-security-audit.mjs",
+    "qa": "npm run typecheck && npm run qa:unit && npm run qa:security && npm run build"
   },
   "devDependencies": {
     "supabase": "^3.0.0"
